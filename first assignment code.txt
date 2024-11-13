@@ -1,0 +1,26 @@
+from pyspark import SparkContext
+
+# Initialize SparkContext
+sc = SparkContext("local", "WordCountApp")
+
+# Path to the local file
+file_path = "/ayush_202200281.txt"
+
+# Read the text file as an RDD
+text_file = sc.textFile(file_path)
+
+# Split each line into words and flatten the result
+words = text_file.flatMap(lambda line: line.split())
+
+# Map each word to a (word, 1) pair
+word_counts = words.map(lambda word: (word, 1))
+
+# Reduce by key (word) to count occurrences
+word_counts = word_counts.reduceByKey(lambda a, b: a + b)
+
+# Collect the results
+for word, count in word_counts.collect():
+    print(f"{word}: {count}")
+
+# Stop the SparkContext
+sc.stop()
