@@ -1,0 +1,53 @@
+from pyspark.sql import SparkSession
+import cv2
+from google.colab.patches import cv2_imshow
+
+# Initialize Spark session
+spark_session = SparkSession.builder.appName("FrameProcessing").getOrCreate()
+
+# Path to your video file (upload the file to Colab or use a URL)
+video_path = "/content/bda_assignmet2.mp4"  # Replace with your video file path
+
+# Initialize video capture
+video_reader = cv2.VideoCapture(video_path)
+
+# Check if video file opened successfully
+if not video_reader.isOpened():
+    print("Error: Could not open the video.")
+else:
+    # Batch size for frame processing
+    batch_size = 10  # Process 10 frames at a time (adjust as needed)
+
+    while True:
+        video_frames = []
+        for _ in range(batch_size):
+            success, img_frame = video_reader.read()
+            if not success:
+                break  # Break if no more frames
+            video_frames.append(img_frame)
+
+        if not video_frames:
+            break  # Exit loop if no frames in batch
+
+        # Parallelize frames using Spark for distributed processing
+        frames_rdd = spark_session.sparkContext.parallelize(video_frames)
+
+        # Define a function to overlay edges on the original frame
+        def overlay_edges_on_frame(image_frame):
+            # Apply edge detection on the color frame
+            edges = cv2.Canny(image_frame, 100, 200)
+            # Create a color overlay of the edges (white edges on original color frame)
+            edges_colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+            combined_frame = cv2.addWeighted(image_frame, 0.8, edges_colored, 0.5, 0)
+            return combined_frame
+        
+        # Apply processing to each frame using PySpark
+        processed_frames = frames_rdd.map(overlay_edges_on_frame).collect()
+
+        # Display processed frames using cv2_imshow in Colab
+        for processed_frame in processed_frames:
+            cv2_imshow(processed_frame)
+
+# Release the video capture
+video_reader.release()
+spark_session.stop()
